@@ -35,7 +35,7 @@ class StringHolder:
     def __init__(self, string : str):
         self.string = string
         
-VERSION : Version = Version(1, 0, 0)
+VERSION : Version = Version(1, 0, 1)
 print(VERSION.str(True))
 
 COMMAND_SYMBOL : str = "."
@@ -62,20 +62,21 @@ class Coder:
         # Convert the binary string to bytes and then decode
         decoded_string = bytes(int(binary_string[i:i+8], 2) for i in range(0, len(binary_string), 8)).decode('utf-8')
         return decoded_string
-    
-    # If input <class 'str'> it will return 'str'
+
     @staticmethod
-    def get_class_name(string: str) -> str:
-        return globals().get(str.split(string, "'")[1], str)
+    def get_type_by_name(name : str) -> type:
+        return eval(name)
+
+
 class File:
     # Data holds in objects as normal string
     # Data type holds in objects as "type" variable
     
     i_separator : str = "#"
     
-    def __init__(self, name : str, data_type : type, data : str):
+    def __init__(self, name : str, data_type : str, data : str):
         self.name : str = name
-        self.data_type : type = data_type
+        self.data_type : str = data_type
         self.data : str = data
         
     def get_raw(self):
@@ -83,22 +84,12 @@ class File:
         #       name # data_type # data
         return Coder.encode(self.name) + File.i_separator + Coder.encode(str(self.data_type)) + File.i_separator + Coder.encode(self.data)
     
-    def get_type(self) -> str:
-        return self.data_type.__name__
     
     def get_full_name(self) -> str:
-        return self.name + "." + self.get_type()
+        return self.name + "." + self.data_type
     
     def get_data(self) -> str:
         return self.data
-    
-    def set_type(self, new_type):
-        if type(new_type) == str:
-            self.data_type = eval(new_type)
-        elif type(new_type) == type:
-            self.data_type = type
-        else:
-            self.data_type = type(new_type)
             
     def set_data(self, new_data : str):
         self.data = new_data
@@ -109,7 +100,7 @@ class File:
     def load(self, data : str):
         tmp = data.split(File.i_separator, 2)
         self.name = Coder.decode(tmp[0])
-        self.set_type(Coder.get_class_name(Coder.decode(tmp[1])))
+        self.data_type = Coder.decode(tmp[1])
         self.data = Coder.decode(tmp[2])
         
 
@@ -185,7 +176,7 @@ class Directory:
                 if type(item) == Directory:
                     out += item.__get_show_dir_str(expand, start_level)
                 elif type(item) == File:
-                    out += Directory.__get_show_str(item.get_full_name(), self.get_directory_level() + 1, " ")
+                    out += Directory.__get_show_str(item.get_full_name(), self.get_directory_level() - start_level + 1, " ")
         return out
     
     def show(self, expand_subdirectories : bool = False):
@@ -194,7 +185,7 @@ class Directory:
             if type(item) == Directory:
                 out += item.__get_show_dir_str(expand_subdirectories, self.get_directory_level())
             elif type(item) == File:
-                out += Directory.__get_show_str(item.get_full_name(), self.get_directory_level() + 1, " ")
+                out += Directory.__get_show_str(item.get_full_name(), 1, " ")
                 
         print(out)
         
@@ -233,12 +224,7 @@ class Directory:
             if data.string[command_indices[current_command.value] + 1] == END_OF_DIRECTORY:
                 current_command.value += 1
                 break
-            
-        
-        
-    
-        
-        
+           
 class FileSystem:
     fsi_separator = "~"
     type_name = "nefis"
@@ -291,10 +277,36 @@ class FileSystem:
         self.nroot.load_dir(data, command_indices, current_command)
         
         
-        
-        
-        
+       
 fs = FileSystem(name = "test-neon-filesystem")
+# nroot = fs.nroot
+# 
+# desktop = Directory("desktop")
+# homework = Directory("lessons")
+# for i in range(10):
+#     homework.add_file(File(f"lesson{i}", "str", "Here is lesson material!"))
+# desktop.add_subdirectory(homework)
+# nroot.add_subdirectory(desktop)
+# 
+# pictures = Directory("images")
+# nroot.add_subdirectory(pictures)
+# 
+# documents = Directory("documents")
+# nroot.add_subdirectory(documents)
+# 
+# maps = Directory("maps")
+# save_locations = Directory("saved-locations")
+# statistics = Directory("statistics")
+# maps.add_subdirectory(save_locations) 
+# maps.add_subdirectory(statistics)
+# save_locations.add_file(File("home", "Vector2", Vector2(0, 0).str())) 
+# save_locations.add_file(File("lpml", "Vector2", Vector2(13, 666).str())) 
+# statistics.add_file(File("steps", "int", str(12765)))
+# statistics.add_file(File("active-time", "float", str(76.3)))
+# nroot.add_subdirectory(maps)
+# 
+# fs.save()
+
 fs.load(fs.filesystem_name)
-nroot = fs.nroot
-nroot.show(True)
+
+fs.nroot.show(True)
