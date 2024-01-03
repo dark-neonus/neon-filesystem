@@ -16,10 +16,11 @@ class Vector2:
         return f"(x: {self.x}, y: {self.y})"
 
 class WhatsNew:
-    def __init__(self, old_version : Version, current_version : Version, add : str, remove : str, change : str, note : str):
+    def __init__(self, old_version : Version, current_version : Version, add : str, remove : str, change : str, fixes : str, note : str):
         self.add : str = add
         self.remove : str = remove
         self.change : str = change
+        self.fixes : str = fixes
         self.note : str = note
         self.old_version : Version = old_version
         self.current_version : Version = current_version
@@ -33,6 +34,8 @@ class WhatsNew:
             out += f"{addition_tab}Removed: {self.remove}\n"
         if self.change:
             out += f"{addition_tab}Changed: {self.change}\n"
+        if self.fixes:
+            out += f"{addition_tab}Fixed: {self.fixes}\n"
         if self.note:
             out += f"{addition_tab}Note: {self.note}\n"
         
@@ -97,14 +100,24 @@ class Path:
     def str(self) -> str:
         return "/".join(self.directories)
 
-VERSION : Version = Version(1, 1, 0)
+VERSION : Version = Version(1, 1, 1)
 VERSION.logs = np.array([
     WhatsNew(
         Version(1, 0, 1),
         Version(1, 1, 0),
-        add="documentation, message/warning/error display system, FyleSystem logs saving, \"What's new?\" logic in Version class, functions to create and delete files/directories, directory back connection, path logic, current directory logic to FileSystem",
+        add="documentation, message/warning/error display system, FileSystem logs saving, \"What's new?\" logic in Version class, functions to create and delete files/directories, directory back connection, path logic, current directory logic to FileSystem",
         remove="",
         change="now function send message/warning/error with FileSystem methods instead of just printing it with print, file and directory find logic",
+        fixes="",
+        note = ""
+    ),
+    WhatsNew(
+        Version(1, 1, 0),
+        Version(1, 1, 1),
+        add="\"fixes\" subparagraph to \"What's new?\" class and output",
+        remove="",
+        change="",
+        fixes="typo in previos version \"What's new?\", doesnt display message that indicate that messages has been enabled",
         note = ""
     )
 ])
@@ -385,17 +398,17 @@ class FileSystem:
     any_output : bool = True
     @staticmethod
     def enable_output() -> None: 
-        FileSystem.message("Output has been enabled!")
         FileSystem.any_output = True
+        FileSystem.message("Output has been enabled!")
     @staticmethod
     def disable_output() -> None: 
         FileSystem.message("Output has been disabled!")
         FileSystem.any_output = False
     show_messages : bool = True
     @staticmethod
-    def enable_messages() -> None: 
-        FileSystem.message("Messages have been enabled!")
+    def enable_messages() -> None:
         FileSystem.show_messages = True
+        FileSystem.message("Messages have been enabled!")
     @staticmethod
     def disable_messages() -> None: 
         FileSystem.message("Messages have been disabled!")
