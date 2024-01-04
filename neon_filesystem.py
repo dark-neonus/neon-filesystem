@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 class Directory:
     pass
@@ -6,6 +7,9 @@ class Version:
     pass
 class Path:
     pass
+class FileSystem:
+    def changed(self):
+        pass
 
 class Vector2:
     def __init__(self, x : int, y : int):
@@ -45,14 +49,15 @@ class WhatsNew:
         return out
 
 class Version:
-    def __init__(self, major : int = 0, minor : int = 0, patch : int = 0):
+    def __init__(self, major : int = 0, minor : int = 0, patch : int = 0, information_text : str = ""):
         self.major : int = int(major)
         self.minor : int = int(minor)
         self.patch : int = int(patch)
         self.logs : np.array = np.array([], dtype=object)
+        self.information_text : str = information_text
         
     def str(self, addition_text : bool = False) -> str:
-        add_txt = "NeonFileSystem Version: " if addition_text else ""
+        add_txt = (self.information_text + " Version: ") if addition_text else ""
         
         return f"{add_txt}{self.major}.{self.minor}.{self.patch}"
     
@@ -74,19 +79,34 @@ class StringHolder:
         self.string = string
 
 class Path:
-    forbidden_symbols = [".", "/", "\\", "\"", "\'", ":", ",", ";", "`"]
+    forbidden_symbols = ["/", "\\", "\"", "\'", ":", ",", ";", "`"]
     def __init__(self, path = ""):
         self.directories = []
-        self.add_path(path)
+        self.__valid = True
+        self.add_path(path)        
+        
+    def is_valid(self) -> bool:
+        return self.__valid
+    
+    def __set_valid(self):
+        self.__valid = True
+    def __set_invalid(self):
+        self.__valid = False
         
     def add_path(self, path : Path):
         if type(path) == Path:
+            if not path.is_valid():
+                self.__set_invalid()
             for dir in path.directories:
                 self.directories.append(dir)
         elif type(path) == str:
             new_dirs = str.split(path, "/")
             for dir in new_dirs:
                 if dir != "":
+                    for ch in Path.forbidden_symbols:
+                        if ch in dir:
+                            FileSystem.warning(f"Path \"{new_dirs}\" contain forbidden character \"{ch}\". Path will be created, but can cause errors!")
+                            self.__set_invalid()
                     self.directories.append(dir)
         else:
             raise TypeError("Invalid path type!")
@@ -99,8 +119,11 @@ class Path:
             
     def str(self) -> str:
         return "/".join(self.directories)
+    
+    def get_os_path(self) -> os.path:
+        return os.path.join(*self.directories)
 
-VERSION : Version = Version(1, 1, 1)
+VERSION : Version = Version(1, 2, 0, "NeonFileSystem")
 VERSION.logs = np.array([
     WhatsNew(
         Version(1, 0, 1),
@@ -119,6 +142,15 @@ VERSION.logs = np.array([
         change="",
         fixes="typo in previos version \"What's new?\", doesnt display message that indicate that messages has been enabled",
         note = ""
+    ),
+    WhatsNew(
+        Version(1, 1, 1),
+        Version(1, 2, 0),
+        add="add valid propertie to FileSystem and Path classes, silent option for messages/warnings/errors, global filesystem propertie to FileSystem, control from console",
+        remove="dot from list of forbidden path symbols",
+        change="now empty message/warning/error would not be displayed, increase code safety",
+        fixes="small tune to prevent spam of messages, a lot of bugs/typos/mistakes",
+        note = "change somethig only in subitems of current global directory, or it will mistakenly indicate as changed(not important, but must be warned)"
     )
 ])
 print(VERSION.str(True))
@@ -129,6 +161,9 @@ BEGIN_OF_FILE : str = "{"
 END_OF_FILE : str = "}"
 BEGIN_OF_DIRECTORY : str = "<"
 END_OF_DIRECTORY : str = ">"
+
+DEFAULT_SYSTEM_FILE_NAME : str = "default"
+DEFAULT_SYSTEM_FILE_EXTENSION : str = "nefis"
 
 class Coder:
     @staticmethod
@@ -184,6 +219,8 @@ class File:
             
     def set_data(self, new_data : str):
         self.data = new_data
+        if type(self.parent_directory) == Directory:
+            FileSystem.global_filesystem.changed()
         
     def set_name(self, new_name : str):
         if new_name == "":
@@ -191,9 +228,17 @@ class File:
         for ch in Path.forbidden_symbols:
             if ch in new_name:
                 FileSystem.error(f"Cant change \"{self.name}\" file name to \"{new_name}\" because it contain forbidden symbol \"{ch}\"!")
+        if new_name == self.name:
+            FileSystem.message(f"It is already its file name")
+            return
+        elif type(self.parent_directory) == Directory:
+            if type(self.parent_directory.get_subdirectory(new_name)) == Directory:
+                FileSystem.error(f"Cant rename directory because directory with the same name already exist!")
         old_name = self.name
         self.name = new_name
         FileSystem.message(f"Name of \"{old_name}\" file has been successfully changed to \"{self.name}\"!") 
+        if type(self.parent_directory) == Directory:
+            FileSystem.global_filesystem.changed()
     
     def load(self, data : str):
         tmp = data.split(File.i_separator, 2)
@@ -227,9 +272,16 @@ class Directory:
         for ch in Path.forbidden_symbols:
             if ch in new_name:
                 FileSystem.error(f"Cant change \"{self.name}\" directory name to \"{new_name}\" because it contain forbidden symbol \"{ch}\"!")
+        if new_name == self.name:
+            FileSystem.message(f"It is already its directory name")
+            return
+        elif type(self.parent_directory) == Directory:
+            if type(self.parent_directory.get_subdirectory(new_name)) == Directory:
+                FileSystem.error(f"Cant rename directory because directory with the same name already exist!")
         old_name = self.name
         self.name = new_name
         FileSystem.message(f"Name of \"{old_name}\" directory has been successfully changed to \"{self.name}\"!")   
+        FileSystem.global_filesystem.changed()
         
     def get_directory_level(self) -> int:
         return self._directory_level
@@ -245,32 +297,34 @@ class Directory:
         if type(subdirectory) != Directory:
             raise TypeError(f"Given object must be a Directory not {type(subdirectory)}")
         elif any(item.name == subdirectory.name for item in self.content):
-            FileSystem.warning(f"Cant add subdirectory, object with name \"{subdirectory.name}\" already exist!")
+            FileSystem.error(f"Cant add subdirectory, object with name \"{subdirectory.name}\" already exist!")
         else:
             self.content = np.append(self.content, subdirectory)
             self.content[-1]._set_directory_level(self.get_directory_level() + 1)
             self.content[-1].parent_directory = self
             FileSystem.message(f"Successfully add \"{subdirectory.name}\" directory!")
+            FileSystem.global_filesystem.changed()
             
     def add_file(self, file : File):
         if type(file) != File:
             raise TypeError(f"Given object must be a File not {type(file)}")
         elif any(item.name == file.name for item in self.content):
-            FileSystem.warning(f"Cant add file, object with name \"{file.name}\" already exist!")
+            FileSystem.error(f"Cant add file, object with name \"{file.name}\" already exist!")
         else:
             self.content = np.append(self.content, file)
             self.content[-1].parent_directory = self
             FileSystem.message(f"Successfully add \"{file.name}\" file!")
+            FileSystem.global_filesystem.changed()
         
     def create_subdirectory(self, name : str, content : np.array = []) -> Directory:
         new_dir = Directory(name)
-        FileSystem.disable_messages()
+        FileSystem.disable_messages(True)
         for item in content:
             if type(item) == Directory:
                 new_dir.add_subdirectory(item)
             elif type(item) == File:
                 new_dir.add_file(item)
-        FileSystem.enable_messages()
+        FileSystem.enable_messages(True)
         self.add_subdirectory(new_dir)
         return self.content[-1]
     
@@ -281,33 +335,35 @@ class Directory:
     
     def delete_subdirectory(self, name : str, delete_if_not_empty : bool = False):
         del_ind : int = -1
-        for i in len(self.content):
+        for i in range(len(self.content)):
             if type(self.content[i]) == Directory and self.content[i].name == name:
                 del_ind = i
                 break
             
         if del_ind == -1:
-            FileSystem.warning(f"Cant delete \"{name}\", there is no such directory!")
+            FileSystem.error(f"Cant delete \"{name}\", there is no such directory!")
             return
-        if not delete_if_not_empty and len(self.content[del_ind].content) == 0:
-            FileSystem.warning(f"Cant delete \"{name}\", directory is not empty!")
+        if not delete_if_not_empty and len(self.content[del_ind].content) > 0:
+            FileSystem.error(f"Cant delete \"{name}\", directory is not empty!")
             return
-        np.delete(self.content, del_ind)
+        self.content = np.delete(self.content, del_ind)
         FileSystem.message(f"\"{name}\" directory has beed successfully deleted!")
+        FileSystem.global_filesystem.changed()
         
     def delete_file(self, name : str):
         del_ind : int = -1
-        for i in len(self.content):
+        for i in range(len(self.content)):
             if type(self.content[i]) == File and (self.content[i].name == name or self.content[i].get_full_name()):
                 del_ind = i
                 break
             
         if del_ind == -1:
-            FileSystem.warning(f"Cant delete \"{name}\", there is no such file!")
+            FileSystem.error(f"Cant delete \"{name}\", there is no such file!")
             return 
-        np.delete(self.content, del_ind)
+        self.content = np.delete(self.content, del_ind)
         FileSystem.message(f"\"{name}\" file has beed successfully deleted!")
-            
+        FileSystem.global_filesystem.changed()
+        
     def get_subdirectory(self, name : str):
         for item in self.content:
             if item.name == name and type(item) == Directory:
@@ -391,63 +447,92 @@ class Directory:
                 break
            
 class FileSystem:
-    fsi_separator = "~"
-    type_name = "nefis"
+    fsi_separator : str = "~"
+    
+    global_filesystem : FileSystem = FileSystem()
+    @staticmethod
+    def set_global_filesystem(fs : FileSystem):
+        FileSystem.global_filesystem = fs
+    def set_as_global(self):
+        FileSystem.set_global_filesystem(self)
+    
+    def changed(self):
+        '''
+        Say to filesystem that it has been changed
+        '''
+        self.__was_changed = True
+    def is_changed(self) -> bool:
+        '''
+        Return True if filesystem was changed and not saved
+        Return False if filesystem was just saved, loaded or created
+        '''
+        return self.__was_changed
     
     # region output parameters
     any_output : bool = True
     @staticmethod
-    def enable_output() -> None: 
+    def enable_output(silent : bool = False) -> None: 
         FileSystem.any_output = True
-        FileSystem.message("Output has been enabled!")
+        FileSystem.message("Output has been enabled!", silent)
     @staticmethod
-    def disable_output() -> None: 
-        FileSystem.message("Output has been disabled!")
+    def disable_output(silent : bool = False) -> None: 
+        FileSystem.message("Output has been disabled!", silent)
         FileSystem.any_output = False
     show_messages : bool = True
     @staticmethod
-    def enable_messages() -> None:
+    def enable_messages(silent : bool = False) -> None:
         FileSystem.show_messages = True
-        FileSystem.message("Messages have been enabled!")
+        FileSystem.message("Messages have been enabled!", silent)
     @staticmethod
-    def disable_messages() -> None: 
-        FileSystem.message("Messages have been disabled!")
+    def disable_messages(silent : bool = False) -> None: 
+        FileSystem.message("Messages have been disabled!", silent)
         FileSystem.show_messages = False
     show_warnings : bool = True
     @staticmethod
-    def enable_warnings() -> None: 
-        FileSystem.message("Warnings have been enabled!")
+    def enable_warnings(silent : bool = False) -> None: 
+        FileSystem.message("Warnings have been enabled!", silent)
         FileSystem.show_warnings = True
     @staticmethod
-    def disable_warnings() -> None: 
-        FileSystem.message("Warnings have been disabled!")
+    def disable_warnings(silent : bool = False) -> None: 
+        FileSystem.message("Warnings have been disabled!", silent)
         FileSystem.show_warnings = False
     show_errors : bool = True
     @staticmethod
-    def enable_errors() -> None: 
-        FileSystem.message("Errors have been enabled!")
+    def enable_errors(silent : bool = False) -> None: 
+        FileSystem.message("Errors have been enabled!", silent)
         FileSystem.show_errors = True
     @staticmethod
-    def disable_errors() -> None: 
-        FileSystem.message("Errors have been disabled!")
+    def disable_errors(silent : bool = False) -> None: 
+        FileSystem.message("Errors have been disabled!", silent)
         FileSystem.show_errors = False
     save_logs : bool = True
     logs : np.ndarray = np.ndarray([], dtype=str)
     @staticmethod
-    def enable_logs() -> None: 
-        FileSystem.message("Logging has been disabled!")
+    def enable_logs(silent : bool = False) -> None: 
+        FileSystem.message("Logging has been disabled!", silent)
         FileSystem.save_logs = True
     @staticmethod
-    def disable_logs() -> None: 
-        FileSystem.message("Logging has been disabled!")
+    def disable_logs(silent : bool = False) -> None: 
+        FileSystem.message("Logging has been disabled!", silent)
         FileSystem.save_logs = False
     # endregion
     
-    def __init__(self, name : str = "neon-filesystem", root_name : str = "nroot"):
+    def __init__(self, name : str = DEFAULT_SYSTEM_FILE_NAME, root_name : str = "nroot"):
         self.filesystem_name : str = name
         self.version : Version = VERSION
         self.nroot : Directory = Directory(root_name)
         self.current_directory : Path = self.nroot.get_path()
+        self.__valid : bool = True
+        self.__was_changed = False
+        
+    def is_valid(self) -> bool:
+        return self.__valid
+    
+    def _set_valid(self):
+        self.__valid = True
+    
+    def _set_invalid(self):
+        self.__valid = False
         
     def get_directory(self, path : Path) -> Directory:
         if type(path) == Path:
@@ -510,26 +595,34 @@ class FileSystem:
     def save(self, file_name : str = ""):
         if file_name == "":
             file_name = self.filesystem_name
-        if not (("." + FileSystem.type_name) in file_name):
-            file_name += "." + FileSystem.type_name
+        if not (("." + DEFAULT_SYSTEM_FILE_EXTENSION) in file_name):
+            file_name += "." + DEFAULT_SYSTEM_FILE_EXTENSION
         with open(file_name, 'w') as file:
             file.write(self.get_raw())
+        FileSystem.__was_changed = False 
             
-    def load(self, file_name : str) -> str:
+    def load(self, path : Path):
+        if type(path) == str:
+            path = Path(path)
         
         # Load data
         raw_data = ""
-        if not (("." + FileSystem.type_name) in file_name):
-            file_name += "." + FileSystem.type_name
-        with open(file_name, 'r') as file:
+        if not (("." + DEFAULT_SYSTEM_FILE_EXTENSION) in path.directories[-1]):
+            path.directories[-1] += "." + DEFAULT_SYSTEM_FILE_EXTENSION
+        with open(path.str(), 'r') as file:
             raw_data = file.read()
         if raw_data == "":
-            return f"Cant read {file_name}.nefis file or it is empty!"
+            FileSystem.error("Cant read \"{file_name}\" file or it is empty!")
+            self._set_invalid()
+            return
         
         fs_parts = str.split(raw_data, self.fsi_separator)[1:-1]
         
         # Read filesystem information
         self.version : Version = Version.load(Coder.decode(fs_parts[0]))
+        if type(self.version) != Version:
+            self._set_invalid()
+            return 
         if self.version.major != VERSION.major:
             FileSystem.warning(f"Loaded filesystem have different major version, high incompability chance!\nCurrent version: {VERSION.str()}\nLoaded version: {self.version.str()}")
         elif self.version.minor != VERSION.minor:
@@ -538,15 +631,16 @@ class FileSystem:
         self.filesystem_name = Coder.decode(fs_parts[1])
         
         # Disable messages
-        FileSystem.disable_messages()
+        FileSystem.disable_messages(True)
         # Read filesystem content
         command_indices = [index for index, char in enumerate(fs_parts[2]) if char == COMMAND_SYMBOL]
         current_command : Iterator = Iterator(0)
         data : StringHolder = StringHolder(fs_parts[2])
         self.nroot.load_dir(data, command_indices, current_command)
         # Enable messages
-        FileSystem.enable_messages()
+        FileSystem.enable_messages(True)
         
+        FileSystem.__was_changed = False 
     @staticmethod
     def add_tabs_to_message(text : str) -> str:
         out : str = ""
@@ -557,17 +651,21 @@ class FileSystem:
         return out            
         
     @staticmethod
-    def message(message : str):
+    def message(message : str, silent : bool = False):
         # Here code choose how to send you a message
+        if message == "":
+            return
         text : str = f"MESSAGE: {FileSystem.add_tabs_to_message(message)}"
-        if FileSystem.any_output and FileSystem.show_messages:
+        if FileSystem.any_output and FileSystem.show_messages and not silent:
             print(text)
         if FileSystem.save_logs:
             FileSystem.logs = np.append(FileSystem.logs, text)
        
     @staticmethod 
-    def warning(warning : str):
+    def warning(warning : str, silent : bool = False):
         # Here code choose how to send you a warning
+        if warning == "":
+            return
         text : str = f"WARNING: {FileSystem.add_tabs_to_message(warning)}"
         if FileSystem.any_output and FileSystem.show_warnings:
             print(text)
@@ -575,8 +673,10 @@ class FileSystem:
             FileSystem.logs = np.append(FileSystem.logs, text)
         
     @staticmethod
-    def error(error: str):
+    def error(error: str, silent : bool = False):
         # Here code choose how to send you an error
+        if error == "":
+            return
         text : str = f"ERROR: {FileSystem.add_tabs_to_message(error)}"
         if FileSystem.any_output and FileSystem.show_errors:
             print(text)
@@ -584,7 +684,7 @@ class FileSystem:
             FileSystem.logs = np.append(FileSystem.logs, text)
         
        
-fs = FileSystem(name = "test-neon-filesystem")
+# fs = FileSystem()
 # nroot = fs.nroot
 # 
 # desktop = Directory("desktop")
@@ -612,6 +712,7 @@ fs = FileSystem(name = "test-neon-filesystem")
 # nroot.add_subdirectory(maps)
 # 
 # fs.save()
+'''
 
 fs.load(fs.filesystem_name)
 
@@ -622,3 +723,5 @@ print(fs.current_directory.str())
 fs.set_current_directory_path("nroot/maps/saved-locations")
 print(fs.current_directory.str())
 fs.get_current_directory().show()
+
+'''

@@ -1,4 +1,4 @@
-# Version 1.1.0
+# Version 1.1.1
 
 '''
 
@@ -142,4 +142,27 @@ Function for user usage:
         > save
         > load
         
+'''
+
+'''
+Console documentation
+
+    $ exit - close console
+
+    $ clear - clear console buffer
+
+    $ cd [path] - go to specific path
+
+    $ ls [flags] - show content of current directory
+        Flags:
+            "-r" - will show content of all subdirectories
+
+    $ touch [filename1] [filename2] [...] - crete empty file
+    
+    $ mkdir [dirname1] [dirname2] [...] - create empty directory
+    
+    $ rm [flags] [filename1] [filename2] [...] - remove file with specific name
+        Flags:
+            "-r" - will delete folder even if isnt empty
+
 '''
