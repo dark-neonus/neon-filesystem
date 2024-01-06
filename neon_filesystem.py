@@ -1,5 +1,7 @@
 import numpy as np
 import os
+from typing import Union, List
+
 
 class Directory:
     pass
@@ -10,6 +12,66 @@ class Path:
 class FileSystem:
     def changed(self):
         pass
+class TextStyle:
+    BOLD = '\033[1m'
+
+class TextStyle:
+    RESET = '\033[0m'
+    
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    BLINK = '\033[5m'
+    REVERSE = '\033[7m'
+    
+    BLACK = '\033[30m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    MAGENTA = '\033[35m'
+    CYAN = '\033[36m'
+    WHITE = '\033[37m'
+    
+    DARK_GRAY = '\033[90m'
+    LIGHT_RED = '\033[91m'
+    LIGHT_GREEN = '\033[92m'
+    LIGHT_YELLOW = '\033[93m'
+    LIGHT_BLUE = '\033[94m'
+    LIGHT_MAGENTA = '\033[95m'
+    LIGHT_CYAN = '\033[96m'
+    LIGHT_GRAY = '\033[97m'
+
+    BOLD_BLACK = '\033[1;30m'
+    BOLD_RED = '\033[1;31m'
+    BOLD_GREEN = '\033[1;32m'
+    BOLD_YELLOW = '\033[1;33m'
+    BOLD_BLUE = '\033[1;34m'
+    BOLD_MAGENTA = '\033[1;35m'
+    BOLD_CYAN = '\033[1;36m'
+    BOLD_WHITE = '\033[1;37m'
+    
+    BOLD_DARK_GRAY = '\033[1;90m'
+    BOLD_LIGHT_RED = '\033[1;91m'
+    BOLD_LIGHT_GREEN = '\033[1;92m'
+    BOLD_LIGHT_YELLOW = '\033[1;93m'
+    BOLD_LIGHT_BLUE = '\033[1;94m'
+    BOLD_LIGHT_MAGENTA = '\033[1;95m'
+    BOLD_LIGHT_CYAN = '\033[1;96m'
+    BOLD_LIGHT_GRAY = '\033[1;97m'
+    
+    def highlight(text : str, style : str = TextStyle.BOLD):
+        return f"\"{TextStyle.style(text, style)}\""
+    
+    def style(text : str, style : str) -> str:
+        if type(style) == str:
+            return style + text + TextStyle.RESET
+        elif type(style) == List[str]:
+            for st in style:
+                text = st + text
+            return text + TextStyle.RESET
+        else:
+            FileSystem.error(f"Invalid style type {TextStyle.highlight(type(style))}. Must be of type {type(style)}, or {type(style)}")
+            return text
 
 class Vector2:
     def __init__(self, x : int, y : int):
@@ -33,15 +95,15 @@ class WhatsNew:
         out : str = ""
         addition_tab : str = "\t" if addition_text else "" 
         if self.add:
-            out += f"{addition_tab}Added: {self.add}\n"
+            out += f"{addition_tab}{TextStyle.style('Added', TextStyle.GREEN)}: {self.add}\n"
         if self.remove:
-            out += f"{addition_tab}Removed: {self.remove}\n"
+            out += f"{addition_tab}{TextStyle.style('Removed', TextStyle.RED)}: {self.remove}\n"
         if self.change:
-            out += f"{addition_tab}Changed: {self.change}\n"
+            out += f"{addition_tab}{TextStyle.style('Changed', TextStyle.YELLOW)}: {self.change}\n"
         if self.fixes:
-            out += f"{addition_tab}Fixed: {self.fixes}\n"
+            out += f"{addition_tab}{TextStyle.style('Fixed', TextStyle.CYAN)}: {self.fixes}\n"
         if self.note:
-            out += f"{addition_tab}Note: {self.note}\n"
+            out += f"{addition_tab}{TextStyle.style('Note', TextStyle.DARK_GRAY)}: {self.note}\n"
         
         if out == "":
             out = "There is no information!"
@@ -57,7 +119,7 @@ class Version:
         self.information_text : str = information_text
         
     def str(self, addition_text : bool = False) -> str:
-        add_txt = (self.information_text + " Version: ") if addition_text else ""
+        add_txt = (TextStyle.style(self.information_text, TextStyle.BOLD_MAGENTA) + " Version: ") if addition_text else ""
         
         return f"{add_txt}{self.major}.{self.minor}.{self.patch}"
     
@@ -67,7 +129,7 @@ class Version:
         return Version(tmp[0], tmp[1], tmp[2])
     
     def whats_new(self, addition_text : bool = False) -> str:
-        add_txt = f"What's new ( {self.logs[-1].old_version.str()} -> {self.logs[-1].current_version.str()} ):\n" if addition_text else ""
+        add_txt = TextStyle.style("What's new", TextStyle.BOLD_BLUE) + f" ( {TextStyle.style(self.logs[-1].old_version.str(), TextStyle.DARK_GRAY)} -> {TextStyle.style(self.logs[-1].current_version.str(), TextStyle.CYAN)} ):\n" if addition_text else ""
         return add_txt + self.logs[-1].str(addition_text) 
     
 class Iterator:
@@ -79,49 +141,43 @@ class StringHolder:
         self.string = string
 
 class Path:
-    forbidden_symbols = ["/", "\\", "\"", "\'", ":", ",", ";", "`"]
-    def __init__(self, path = ""):
+    forbidden_symbol = "/"
+    def __init__(self, path : Union[str, Path, List[str]] = ""):
         self.directories = []
-        self.__valid = True
-        self.add_path(path)        
+        self.add_path(path)
         
-    def is_valid(self) -> bool:
-        return self.__valid
-    
-    def __set_valid(self):
-        self.__valid = True
-    def __set_invalid(self):
-        self.__valid = False
+    def is_empty(self):
+        return len(self.directories) == 0
         
     def add_path(self, path : Path):
         if type(path) == Path:
-            if not path.is_valid():
-                self.__set_invalid()
             for dir in path.directories:
                 self.directories.append(dir)
         elif type(path) == str:
-            new_dirs = str.split(path, "/")
-            for dir in new_dirs:
+            self.add_path(str.split(path, "/"))
+        elif type(path) == list:
+            for dir in path:
                 if dir != "":
-                    for ch in Path.forbidden_symbols:
-                        if ch in dir:
-                            FileSystem.warning(f"Path \"{new_dirs}\" contain forbidden character \"{ch}\". Path will be created, but can cause errors!")
-                            self.__set_invalid()
+                    if Path.forbidden_symbol in dir:
+                        FileSystem.error(f"Path {TextStyle.highlight(dir)} contain forbidden character {TextStyle.highlight(Path.forbidden_symbol)}!")
+                        raise RuntimeError(f"Path \"{dir}\" contain forbidden character \"{Path.forbidden_symbol}\"")
                     self.directories.append(dir)
         else:
-            raise TypeError("Invalid path type!")
+            raise TypeError(f"Invalid path type - {type(path)}!")
     
     def back(self, times : int = 1):
         if times < 0:
             raise ValueError("Cant go back negative amount of times!")
         elif times > 0:
-            self.directories = self.directories[:-times]
-            
+            self.directories = self.directories[:-times]        
+    
     def str(self) -> str:
         return "/".join(self.directories)
     
     def get_os_path(self) -> os.path:
         return os.path.join(*self.directories)
+    
+    
 
 VERSION : Version = Version(1, 2, 0, "NeonFileSystem")
 VERSION.logs = np.array([
@@ -151,6 +207,15 @@ VERSION.logs = np.array([
         change="now empty message/warning/error would not be displayed, increase code safety",
         fixes="small tune to prevent spam of messages, a lot of bugs/typos/mistakes",
         note = "change somethig only in subitems of current global directory, or it will mistakenly indicate as changed(not important, but must be warned)"
+    ),
+    WhatsNew(
+        Version(1, 2, 0),
+        Version(1, 3, 0),
+        add="terminal color support and TextStyle class, now messages/warnings/errors have own colors, now show() function of Directory class give colorfull output, is_empty() function in Path class",
+        remove="is_valid logic from Path class",
+        change="increase code safety, now Path class support all symbols but \"/\"",
+        fixes="bug and mistakes fixes",
+        note =""
     )
 ])
 print(VERSION.str(True))
@@ -224,10 +289,10 @@ class File:
         
     def set_name(self, new_name : str):
         if new_name == "":
-            FileSystem.error(f"Cant change \"{self.name}\" file name to an empty string!")
-        for ch in Path.forbidden_symbols:
-            if ch in new_name:
-                FileSystem.error(f"Cant change \"{self.name}\" file name to \"{new_name}\" because it contain forbidden symbol \"{ch}\"!")
+            FileSystem.error(f"Cant change {TextStyle.highlight(self.name)} file name to an empty string!")
+        if Path.forbidden_symbol in new_name:
+            FileSystem.error(f"Cant change {TextStyle.highlight(self.name)} file name to {TextStyle.highlight(new_name)} because it contain {TextStyle.highlight(Path.forbidden_symbol)}!")
+            raise RuntimeError(f"Cant change {self.name} file name to {new_name} because it contain {Path.forbidden_symbol}!")
         if new_name == self.name:
             FileSystem.message(f"It is already its file name")
             return
@@ -236,7 +301,7 @@ class File:
                 FileSystem.error(f"Cant rename directory because directory with the same name already exist!")
         old_name = self.name
         self.name = new_name
-        FileSystem.message(f"Name of \"{old_name}\" file has been successfully changed to \"{self.name}\"!") 
+        FileSystem.message(f"Name of {TextStyle.highlight(old_name)} file has been successfully changed to {TextStyle.highlight(self.name)}!") 
         if type(self.parent_directory) == Directory:
             FileSystem.global_filesystem.changed()
     
@@ -268,10 +333,10 @@ class Directory:
         
     def set_name(self, new_name : str):
         if new_name == "":
-            FileSystem.error(f"Cant change \"{self.name}\" directory name to an empty string!")
-        for ch in Path.forbidden_symbols:
-            if ch in new_name:
-                FileSystem.error(f"Cant change \"{self.name}\" directory name to \"{new_name}\" because it contain forbidden symbol \"{ch}\"!")
+            FileSystem.error(f"Cant change {TextStyle.highlight(self.name)} directory name to an empty string!")
+        if Path.forbidden_symbol in new_name:
+            FileSystem.error(f"Cant change {TextStyle.highlight(self.name)} directory name to {TextStyle.highlight(new_name)} because it contain {TextStyle.highlight(Path.forbidden_symbol)}!")
+            raise RuntimeError(f"Cant change {self.name} directory name to {new_name} because it contain {Path.forbidden_symbol}!")
         if new_name == self.name:
             FileSystem.message(f"It is already its directory name")
             return
@@ -280,7 +345,7 @@ class Directory:
                 FileSystem.error(f"Cant rename directory because directory with the same name already exist!")
         old_name = self.name
         self.name = new_name
-        FileSystem.message(f"Name of \"{old_name}\" directory has been successfully changed to \"{self.name}\"!")   
+        FileSystem.message(f"Name of {TextStyle.highlight(old_name)} directory has been successfully changed to {TextStyle.highlight(self.name)}!")   
         FileSystem.global_filesystem.changed()
         
     def get_directory_level(self) -> int:
@@ -295,25 +360,25 @@ class Directory:
     # region content managment
     def add_subdirectory(self, subdirectory : Directory):
         if type(subdirectory) != Directory:
-            raise TypeError(f"Given object must be a Directory not {type(subdirectory)}")
+            raise TypeError(f"Given object must be a Directory not {TextStyle.highlight(type(subdirectory))}")
         elif any(item.name == subdirectory.name for item in self.content):
-            FileSystem.error(f"Cant add subdirectory, object with name \"{subdirectory.name}\" already exist!")
+            FileSystem.error(f"Cant add subdirectory, object with name {TextStyle.highlight(subdirectory.name)} already exist!")
         else:
             self.content = np.append(self.content, subdirectory)
             self.content[-1]._set_directory_level(self.get_directory_level() + 1)
             self.content[-1].parent_directory = self
-            FileSystem.message(f"Successfully add \"{subdirectory.name}\" directory!")
+            FileSystem.message(f"Successfully add {TextStyle.highlight(subdirectory.name)} directory!")
             FileSystem.global_filesystem.changed()
             
     def add_file(self, file : File):
         if type(file) != File:
             raise TypeError(f"Given object must be a File not {type(file)}")
         elif any(item.name == file.name for item in self.content):
-            FileSystem.error(f"Cant add file, object with name \"{file.name}\" already exist!")
+            FileSystem.error(f"Cant add file, object with name {TextStyle.highlight(file.name)} already exist!")
         else:
             self.content = np.append(self.content, file)
             self.content[-1].parent_directory = self
-            FileSystem.message(f"Successfully add \"{file.name}\" file!")
+            FileSystem.message(f"Successfully add {TextStyle.highlight(file.get_full_name())} file!")
             FileSystem.global_filesystem.changed()
         
     def create_subdirectory(self, name : str, content : np.array = []) -> Directory:
@@ -341,74 +406,79 @@ class Directory:
                 break
             
         if del_ind == -1:
-            FileSystem.error(f"Cant delete \"{name}\", there is no such directory!")
+            FileSystem.error(f"Cant delete {TextStyle.highlight(name)}, there is no such directory!")
             return
         if not delete_if_not_empty and len(self.content[del_ind].content) > 0:
-            FileSystem.error(f"Cant delete \"{name}\", directory is not empty!")
+            FileSystem.error(f"Cant delete {TextStyle.highlight(name)}, directory is not empty!")
             return
         self.content = np.delete(self.content, del_ind)
-        FileSystem.message(f"\"{name}\" directory has beed successfully deleted!")
+        FileSystem.message(f"{TextStyle.highlight(name)} directory has beed successfully deleted!")
         FileSystem.global_filesystem.changed()
         
     def delete_file(self, name : str):
         del_ind : int = -1
         for i in range(len(self.content)):
-            if type(self.content[i]) == File and (self.content[i].name == name or self.content[i].get_full_name()):
+            if type(self.content[i]) == File and (self.content[i].name == name or self.content[i].get_full_name() == name):
                 del_ind = i
                 break
             
         if del_ind == -1:
-            FileSystem.error(f"Cant delete \"{name}\", there is no such file!")
+            FileSystem.error(f"Cant delete {TextStyle.highlight(name)}, there is no such file!")
             return 
         self.content = np.delete(self.content, del_ind)
-        FileSystem.message(f"\"{name}\" file has beed successfully deleted!")
+        FileSystem.message(f"{TextStyle.highlight(name)} file has beed successfully deleted!")
         FileSystem.global_filesystem.changed()
         
     def get_subdirectory(self, name : str):
         for item in self.content:
             if item.name == name and type(item) == Directory:
                 return item
-        FileSystem.warning(f"There is no directory with \"{name}\" name!")
+        FileSystem.warning(f"There is no directory with {TextStyle.highlight(name)} name!")
         return None
        
     def get_file(self, name : str):
         for item in self.content:
             if type(item) == File and (item.name == name or item.get_full_name() == name):
                 return item
-        FileSystem.warning(f"There is no file with \"{name}\" name!")
+        FileSystem.warning(f"There is no file with {TextStyle.highlight(name)} name!")
         return None
     
     def get_item(self, name : str):
         for item in self.content:
             if (type(item) == Directory and item.name == name) or (type(item) == File and (item.name == name or item.get_full_name() == name)):
                 return item
-        FileSystem.warning(f"There is no item with \"{name}\" name!")
+        FileSystem.warning(f"There is no item with {TextStyle.highlight(name)} name!")
         return None  
     # endregion 
         
     @staticmethod
     def __get_show_str(name : str, level : int, specil_char : str) -> str:
-        return "|\t" * level + specil_char + name + "\n"
+        return TextStyle.style("|\t" * level, TextStyle.DARK_GRAY) + specil_char + name + "\n"
     
     def __get_show_dir_str(self, expand : bool = False, start_level : int = -1) -> str:
         if start_level == -1:
             start_level = self.get_directory_level()
-        out = Directory.__get_show_str(self.name, self.get_directory_level() - start_level, "*")
+        out = Directory.__get_show_str(TextStyle.style(self.name, TextStyle.BOLD_BLUE), self.get_directory_level() - start_level, "*")
         if expand:
             for item in self.content:
                 if type(item) == Directory:
                     out += item.__get_show_dir_str(expand, start_level)
                 elif type(item) == File:
-                    out += Directory.__get_show_str(item.get_full_name(), self.get_directory_level() - start_level + 1, " ")
+                    out += Directory.__get_show_str(TextStyle.style(item.get_full_name(), TextStyle.CYAN), self.get_directory_level() - start_level + 1, " ")
         return out
     
     def show(self, expand_subdirectories : bool = False):
-        out = f"@ [{self.name}]\n|\n"
+        out = TextStyle.style("@", TextStyle.BLUE) + " "
+        if self.get_directory_level() == 0:
+            out += TextStyle.style("[" + self.name + "]", TextStyle.BOLD_MAGENTA)
+        else: 
+            out += TextStyle.style("[" + self.name + "]", TextStyle.BOLD_BLUE)
+        out += "\n" + TextStyle.style("|", TextStyle.DARK_GRAY) + "\n"
         for item in self.content:
             if type(item) == Directory:
                 out += item.__get_show_dir_str(expand_subdirectories, self.get_directory_level())
             elif type(item) == File:
-                out += Directory.__get_show_str(item.get_full_name(), 1, " ")
+                out += Directory.__get_show_str(TextStyle.style(item.get_full_name(), TextStyle.CYAN), 1, " ")
         print(out)
         
         
@@ -521,9 +591,11 @@ class FileSystem:
         self.filesystem_name : str = name
         self.version : Version = VERSION
         self.nroot : Directory = Directory(root_name)
-        self.current_directory : Path = self.nroot.get_path()
+        self.current_directory_path : Path = self.nroot.get_path()
         self.__valid : bool = True
         self.__was_changed = False
+        if Path.forbidden_symbol in self.filesystem_name:
+            raise RuntimeError(f"FileSystem name {self.filesystem_name} cant contain \"{Path.forbidden_symbol}\"")
         
     def is_valid(self) -> bool:
         return self.__valid
@@ -538,13 +610,13 @@ class FileSystem:
         if type(path) == Path:
             
             if path.directories[0] != self.nroot.name:
-                FileSystem.error(f"Path \"{path.str()}\" is invalid!")
+                FileSystem.error(f"Path {TextStyle.highlight(path.str())} is invalid!")
                 return None
             current_dir = self.nroot
             for dir_name in path.directories[1:]:
                 current_dir = current_dir.get_subdirectory(dir_name)
                 if current_dir == None:
-                    FileSystem.error(f"Path \"{path.str()}\" is invalid. There is no \"{dir_name}\" directory!")
+                    FileSystem.error(f"Path {TextStyle.highlight(path.str())} is invalid. There is no {TextStyle.highlight(dir_name)} directory!")
                     return None
             return current_dir
         elif type(path) == str:
@@ -556,17 +628,17 @@ class FileSystem:
         if type(path) == Path:
             
             if path.directories[0] != self.nroot.name:
-                FileSystem.error(f"Path \"{path.str()}\" is invalid!")
+                FileSystem.error(f"Path {TextStyle.highlight(path.str())} is invalid!")
                 return None
             current_dir = self.nroot
             for dir_name in path.directories[1:-1]:
                 current_dir = current_dir.get_subdirectory(dir_name)
                 if current_dir == None:
-                    FileSystem.error(f"Path \"{path.str()}\" is invalid. There is no \"{dir_name}\" directory!")
+                    FileSystem.error(f"Path {TextStyle.highlight(path.str())} is invalid. There is no {TextStyle.highlight(dir_name)} directory!")
                     return None
             file : File = current_dir.get_file(path.directories[-1])
             if file == None:
-                    FileSystem.error(f"There is no \"{path.directories[-1]}\" file in \"{Path(path.directories[:-1]).str()}\" directory!")
+                    FileSystem.error(f"There is no {TextStyle.highlight(path.directories[-1])} file in {TextStyle.highlight(Path(path.directories[:-1]).str())} directory!")
                     return None
             return file
         elif type(path) == str:
@@ -575,14 +647,13 @@ class FileSystem:
             raise TypeError("Given path must be of type \"str\" or \"Path\"!")
     
     def set_current_directory_path(self, path : Path):
-        target_dir = self.get_directory(path)
-        if target_dir == None:
-            self.error(f"There is no \"{path if type(path) == str else path.str()}\" directory!")
+        if type(self.get_directory(path)) != Directory:
+            self.error(f"There is no {TextStyle.highlight(path if type(path) == str else path.str())} directory!")
             return
-        self.current_directory = target_dir.get_path()
+        self.current_directory_path = Path(path)
         
     def get_current_directory(self) -> Directory:
-        return self.get_directory(self.current_directory)    
+        return self.get_directory(self.current_directory_path)    
     
     def get_root_name(self) -> str:
         return self.nroot.name
@@ -612,7 +683,7 @@ class FileSystem:
         with open(path.str(), 'r') as file:
             raw_data = file.read()
         if raw_data == "":
-            FileSystem.error("Cant read \"{file_name}\" file or it is empty!")
+            FileSystem.error(f"Cant read {TextStyle.highlight(path.str())} file or it is empty!")
             self._set_invalid()
             return
         
@@ -624,9 +695,9 @@ class FileSystem:
             self._set_invalid()
             return 
         if self.version.major != VERSION.major:
-            FileSystem.warning(f"Loaded filesystem have different major version, high incompability chance!\nCurrent version: {VERSION.str()}\nLoaded version: {self.version.str()}")
+            FileSystem.warning(f"Loaded filesystem have different major version, {TextStyle.highlight('high incompability chance', TextStyle.BOLD_YELLOW)}!\nCurrent version: {TextStyle.highlight(VERSION.str())}\nLoaded version: {TextStyle.highlight(self.version.str())}")
         elif self.version.minor != VERSION.minor:
-            FileSystem.message(f"Loaded filesystem have different minor version, low incompability chance!\nCurrent version: {VERSION.str()}\nLoaded version: {self.version.str()}")
+            FileSystem.message(f"Loaded filesystem have different minor version, {TextStyle.highlight('low incompability chance', TextStyle.BOLD_GREEN)}!\nCurrent version: {TextStyle.highlight(VERSION.str())}\nLoaded version: {TextStyle.highlight(self.version.str())}")
         
         self.filesystem_name = Coder.decode(fs_parts[1])
         
@@ -640,7 +711,9 @@ class FileSystem:
         # Enable messages
         FileSystem.enable_messages(True)
         
-        FileSystem.__was_changed = False 
+        FileSystem.__was_changed = False
+        if Path.forbidden_symbol in self.filesystem_name:
+            raise RuntimeError(f"FileSystem name {self.filesystem_name} cant contain \"{Path.forbidden_symbol}\"")
     @staticmethod
     def add_tabs_to_message(text : str) -> str:
         out : str = ""
@@ -655,7 +728,7 @@ class FileSystem:
         # Here code choose how to send you a message
         if message == "":
             return
-        text : str = f"MESSAGE: {FileSystem.add_tabs_to_message(message)}"
+        text : str = f"{TextStyle.style('MESSAGE', TextStyle.BOLD_GREEN)}: {FileSystem.add_tabs_to_message(message)}"
         if FileSystem.any_output and FileSystem.show_messages and not silent:
             print(text)
         if FileSystem.save_logs:
@@ -666,7 +739,7 @@ class FileSystem:
         # Here code choose how to send you a warning
         if warning == "":
             return
-        text : str = f"WARNING: {FileSystem.add_tabs_to_message(warning)}"
+        text : str = f"{TextStyle.style('WARNING', TextStyle.BOLD_YELLOW)}: {FileSystem.add_tabs_to_message(warning)}"
         if FileSystem.any_output and FileSystem.show_warnings:
             print(text)
         if FileSystem.save_logs:
@@ -677,51 +750,81 @@ class FileSystem:
         # Here code choose how to send you an error
         if error == "":
             return
-        text : str = f"ERROR: {FileSystem.add_tabs_to_message(error)}"
+        text : str = f"{TextStyle.style('ERROR', TextStyle.BOLD_RED)}: {FileSystem.add_tabs_to_message(error)}"
         if FileSystem.any_output and FileSystem.show_errors:
             print(text)
         if FileSystem.save_logs:
             FileSystem.logs = np.append(FileSystem.logs, text)
         
-       
-# fs = FileSystem()
-# nroot = fs.nroot
-# 
-# desktop = Directory("desktop")
-# homework = Directory("lessons")
-# for i in range(10):
-#     homework.add_file(File(f"lesson{i}", "str", "Here is lesson material!"))
-# desktop.add_subdirectory(homework)
-# nroot.add_subdirectory(desktop)
-# 
-# pictures = Directory("images")
-# nroot.add_subdirectory(pictures)
-# 
-# documents = Directory("documents")
-# nroot.add_subdirectory(documents)
-# 
-# maps = Directory("maps")
-# save_locations = Directory("saved-locations")
-# statistics = Directory("statistics")
-# maps.add_subdirectory(save_locations) 
-# maps.add_subdirectory(statistics)
-# save_locations.add_file(File("home", "Vector2", Vector2(0, 0).str())) 
-# save_locations.add_file(File("lpml", "Vector2", Vector2(13, 666).str())) 
-# statistics.add_file(File("steps", "int", str(12765)))
-# statistics.add_file(File("active-time", "float", str(76.3)))
-# nroot.add_subdirectory(maps)
-# 
-# fs.save()
-'''
+def create_default_filesystem():
+    fs = FileSystem()
+    nroot = fs.nroot
+    
+    user = Directory("user")
 
-fs.load(fs.filesystem_name)
+    desktop = Directory("desktop")
+    desktop.create_file("google-chrome", "bin", "Here is Google Chrome binary file) It is empty ;-)")
+    desktop.create_file("python", "cpp", "int main() { std::cout << \"Hello world!\" << std::endl }")
+    
+    trash = Directory("trash")
+    trash.create_file("windows", "iso", "print(\"Hello World!\")")
+    trash.create_file("mac-os", "iso", "print(\"Life is suck!\")")
+    trash.create_file("edge", "bin", "Trash here!")
+    trash.create_file("xdfw-hfgd-wkas-pkfm", "tmp", "ddfghshauyuvdSBcgnai52678yfjcia anoA F UJHAV2Y8272YJDA;.AsA.C,ABASMNFACUYBW  UDHsdasda")
+    trash.create_file("virus", "exe")
+    
+    desktop.add_subdirectory(trash)
 
-fs.nroot.show(True)
-print(fs.current_directory.str())
-fs.set_current_directory_path("nroot/desktop/games/doom")
-print(fs.current_directory.str())
-fs.set_current_directory_path("nroot/maps/saved-locations")
-print(fs.current_directory.str())
-fs.get_current_directory().show()
+    pictures = Directory("pictures")
+    pictures.create_file("first-artwork", "trash", "¯\_(*-*)_/¯")
+    pictures.create_file("linux-icon", "png", "Linux is sexy!")
+    
+    documents = Directory("documents")
+    documents.create_file("calculator", "py", "print(f\"2 + 2 = {2 + 2}\")")
+    documents.create_file("statistics", "xml", "1|2|3|4|5|6|7|8|9|10|11|12|My work is suck!|14|15|16|17|18|19|20")
+    
+    desktop.add_subdirectory(documents)
+    
+    user.add_subdirectory(desktop)
+    
+    applications = Directory("application")
+    applications.create_file("wine", "bin", "Wine is gold! <3")
+    applications.create_file("vs-code", "bin", "Write code here!")
+    applications.create_file("SuperTuxKart", "bin", "Best game of all times!!!")
 
-'''
+    user.add_subdirectory(applications)
+    
+    nroot.add_subdirectory(user)
+
+    bin_dir = Directory("bin")
+    
+    bin_dir.create_subdirectory("snap")
+    bin_dir.create_file("wine", "bin", "begin of code ...magic... end of code")
+    bin_dir.create_file("terminal", "bin", "nroot > ")
+    bin_dir.create_file("filemanager", "bin", "Files goes brrrr...")
+    
+    nroot.add_subdirectory(bin_dir)
+    
+    tmp = Directory("tmp")
+    
+    google = Directory("google")
+    google.create_file("x7j1", "bin", "joasdad721kjansjdq2e7a")
+    google.create_file("s3pq", "bin", "olanuc1239ij7yhb5rd4e2")
+    google.create_file("cookies", "bin", "All possible information about you and your family")
+    
+    tmp.add_subdirectory(google)
+    
+    tmp.create_file("5zYb-jCda-3A4Q", "tmp", "drio-JYjS-liDB")
+    tmp.create_file("H2dR-e1ia-TViX", "tmp", "IZzr-VE6a-yxUP")
+    tmp.create_file("9FXh-jNvY-XtGx", "tmp", "tkHa-O212-4x62")
+    tmp.create_file("6Z3A-bBw6-XfV6", "tmp", "WQ55-540A-xoiu")
+    tmp.create_file("U1lB-Ksse-RhmW", "tmp", "u7EV-ce4u-1M5i")
+    tmp.create_file("4f5u-sawX-OkrS", "tmp", "N3ah-fV1e-999F")
+    
+    nroot.add_subdirectory(tmp)
+    
+    nroot.create_subdirectory("mnt")
+
+    fs.save()
+
+# create_default_filesystem()

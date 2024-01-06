@@ -155,7 +155,7 @@ Console documentation
 
     $ ls [flags] - show content of current directory
         Flags:
-            "-r" - will show content of all subdirectories
+            "-R" - will show content of all subdirectories
 
     $ touch [filename1] [filename2] [...] - crete empty file
     
@@ -163,6 +163,8 @@ Console documentation
     
     $ rm [flags] [filename1] [filename2] [...] - remove file with specific name
         Flags:
-            "-r" - will delete folder even if isnt empty
+            "-r" or "-R" - will delete folder even if isnt empty
+            
+    $ cat [filename1] [filename2] [...] - print content of specific file
 
 '''
