@@ -104,7 +104,7 @@ class Console:
             path : Path = self.__process_path(Path(path_str))
             self.fs.set_current_directory_path(path)
             self.fs.get_current_directory().show(resursive)
-        self.fs.set_current_directory_path(curr_dir_tmp)
+            self.fs.set_current_directory_path(curr_dir_tmp)
         
     def clear_console(self):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -155,7 +155,7 @@ class Console:
                 dr.parent_directory.delete_subdirectory(path.directories[-1], recursive)
                 continue
             FileSystem.message(f"There is no item {TextStyle.highlight(path.str())}!")
-        self.fs.set_current_directory_path(start_path)
+            self.fs.set_current_directory_path(start_path)
     
     def show_file_content(self, args : List[str]):
         start_path = Path(self.fs.current_directory_path)
@@ -168,7 +168,7 @@ class Console:
                 print(f"\n{file.get_data()}\n")
             else:
                 FileSystem.message(f"There is no file in {TextStyle.highlight(path.str())}!")
-        self.fs.set_current_directory_path(start_path)
+            self.fs.set_current_directory_path(start_path)
     
     # endregion
     
