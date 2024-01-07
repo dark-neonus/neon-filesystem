@@ -227,6 +227,15 @@ VERSION.history = np.array([
         change="small code cleaning, documentation big update",
         fixes="",
         note =""
+    ),
+    WhatsNew(
+        Version(1, 3, 1),
+        Version(1, 3, 2),
+        add="",
+        remove="",
+        change="content of file now have name \"content\" instead of data",
+        fixes="",
+        note =""
     )
 ])
 print(VERSION.str(True))
@@ -269,13 +278,13 @@ class File:
     def __init__(self, name : str, data_type : str, data : str, parent_directory : Directory = None):
         self.name : str = name
         self.data_type : str = data_type
-        self.data : str = data
+        self.content : str = data
         self.parent_directory : Directory = parent_directory
         
     def get_raw(self):
         #       Raw structure(# - separator):
         #       name # data_type # data
-        return Coder.encode(self.name) + File.i_separator + Coder.encode(str(self.data_type)) + File.i_separator + Coder.encode(self.data)
+        return Coder.encode(self.name) + File.i_separator + Coder.encode(str(self.data_type)) + File.i_separator + Coder.encode(self.content)
     
     def get_path(self, include_itself : bool = True, show_type : bool = True) -> Path:
         path = self.parent_directory.get_path()
@@ -286,11 +295,11 @@ class File:
     def get_full_name(self) -> str:
         return self.name + "." + self.data_type
     
-    def get_data(self) -> str:
-        return self.data
+    def get_content(self) -> str:
+        return self.content
             
-    def set_data(self, new_data : str):
-        self.data = new_data
+    def set_content(self, new_content : str):
+        self.content = new_content
         if type(self.parent_directory) == Directory:
             FileSystem.global_filesystem.changed()
         
@@ -316,7 +325,7 @@ class File:
         tmp = data.split(File.i_separator, 2)
         self.name = Coder.decode(tmp[0])
         self.data_type = Coder.decode(tmp[1])
-        self.data = Coder.decode(tmp[2])
+        self.content = Coder.decode(tmp[2])
         
 
 class Directory:

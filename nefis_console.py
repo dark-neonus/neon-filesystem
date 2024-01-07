@@ -1,5 +1,7 @@
 from neon_filesystem import *
 
+MOVEOUT_FOLDER = "moveout"
+
 CONSOLE_VERSION : Version = Version(0, 1, 0, "NeonFileSystem Console Manager")
 VERSION.history = np.array([
     WhatsNew(
@@ -81,14 +83,14 @@ console_documentation = {
         ("help", "help with commands"),
         "[***COMMAND***]...",
         "Show manual page for ***COMMAND*** with synopsis, description and examples.\n\tSame as !!!man!!!.",
-        [("-a, -A", "Show all available manual pages")],
+        [("-a, -A", "Show all available manual pages"), ("-l, -L", "Show list of available commands")],
         ["!!!help!!!", "!!!ls!!!", "!!!mkdir!!!"]
     ),
     "man" : create_help(
         ("help", "help with commands"),
         "[***COMMAND***]...",
         "Show manual page for ***COMMAND*** with synopsis, description and examples.\n\tSame as !!!help!!!.",
-        [("-a, -A", "Show all available manual pages")],
+        [("-a, -A", "Show all available manual pages"), ("-l, -L", "Show list of available commands")],
         ["!!!help!!!", "!!!ls!!!", "!!!mkdir!!!"]
     ),
     "exit" : create_help(
@@ -116,7 +118,7 @@ console_documentation = {
         ("ls", "list directory content"),
         "[***OPTIONS***] [***PATH***]...",
         "Will show content of directory in ***PATH***.\n\tIf ***PATH*** is empty, will show content of current directory.",
-        [("-R", "Recursively show content of subdirectories")],
+        [("-r, -R", "Recursively show content of subdirectories")],
         ["nroot/tmp", "", "-R nroot"]
     ),
     "touch" : create_help(
@@ -147,9 +149,14 @@ console_documentation = {
         [],
         ["nroot/tmp/log27.tmp nroot/tmp/log28.tmp", "homework.docs", "trash/notes.txt"]
     ),
+    "moveout" : create_help(
+        ("moveout", "export files and directories to external filesystem"),
+        "[***PATH***]...",
+        f"Will export files and directories from ***FILE*** neon_filesystem path\n\tto ./{MOVEOUT_FOLDER}/filesystem_name/***PATH*** path",
+        [],
+        ["nroot/tmp/log27.tmp nroot/tmp/log28.tmp", "nroot", "trash/notes.txt"]
+    ),
 }   
-
-print(console_documentation["mkdir"])
 
 class Console:
     def __init__(self):
@@ -218,6 +225,11 @@ class Console:
                         FileSystem.message(f"Command {TextStyle.highlight('cat')} missing arguments!")
                     else:
                         self.show_file_content(commands[1:])
+                case "moveout":
+                    if len(commands) == 1:
+                        FileSystem.message(f"Command {TextStyle.highlight('moveout')} missing arguments!")
+                    else:
+                        self.moveout(commands[1:])
                         
             if self.autosave and self.fs.is_changed():
                 self.save_filesystem(self.__loaded_fs_path)
@@ -237,42 +249,44 @@ class Console:
             
     def show_directory_content(self, args : List[str]):
         resursive = False
-        if len(args) > 0 and args[0] == "-R":
+        if len(args) > 0 and (args[0] == "-r" or args[0] == "-R"):
             resursive = True
             args = args[1:]
         if len(args) == 0:
             self.fs.get_current_directory().show(resursive)
             return
-        curr_dir_tmp : Path = Path(self.fs.current_directory_path)
+        start_path : Path = Path(self.fs.current_directory_path)
         for path_str in args:
+            self.fs.set_current_directory_path(start_path)
             path : Path = self.__process_path(Path(path_str))
             self.fs.set_current_directory_path(path)
             self.fs.get_current_directory().show(resursive)
-            self.fs.set_current_directory_path(curr_dir_tmp)
+            self.fs.set_current_directory_path(start_path)
         
     def clear_console(self):
         os.system('cls' if os.name == 'nt' else 'clear')
     
     def create_empty_file(self, args : List[str]):
+        start_path : Path = Path(self.fs.current_directory_path)
         for path_str in args:
+            self.fs.set_current_directory_path(start_path)
             path = self.__process_path(Path(path_str))
-            curr_dir_tmp : Path = Path(self.fs.current_directory_path)
             self.fs.set_current_directory_path(Path(self.fs.current_directory_path.directories + path.directories[:-1]))
             tmp = path.directories[-1].rsplit(".", 1)
             # if file extension not specified it will assigne ".bin" extension to it
             if len(tmp) < 2:
                 tmp.append("bin")
             self.fs.get_current_directory().create_file(tmp[0], tmp[1])
-            self.fs.set_current_directory_path(curr_dir_tmp)
+            self.fs.set_current_directory_path(start_path)
             
     def create_empty_directory(self, args : List[str]):
         for path_str in args:
             path = self.__process_path(Path(path_str))
-            curr_dir_tmp : Path = Path(self.fs.current_directory_path)
+            start_path : Path = Path(self.fs.current_directory_path)
             
             self.fs.set_current_directory_path(Path(path.directories[:-1]))
             self.fs.get_current_directory().create_subdirectory(path.directories[-1])
-            self.fs.set_current_directory_path(curr_dir_tmp)
+            self.fs.set_current_directory_path(start_path)
     
     def remove_item(self, args : List[str]):
         recursive = False
@@ -281,6 +295,7 @@ class Console:
             args = args[1:]
         start_path = Path(self.fs.current_directory_path)
         for path in args:
+            self.fs.set_current_directory_path(start_path)
             path = self.__process_path(Path(path))
             if len(path.directories) == 1:
                 FileSystem.message("You cant delete main nroot directory ;-)")
@@ -307,12 +322,13 @@ class Console:
     def show_file_content(self, args : List[str]):
         start_path = Path(self.fs.current_directory_path)
         for path_str in args:
+            self.fs.set_current_directory_path(start_path)
             path = self.__process_path(Path(path_str))
             self.fs.set_current_directory_path(Path(path.directories[:-1]))
             file = self.fs.get_current_directory().get_file(path.directories[-1])
             FileSystem.enable_output(True)
             if type(file) == File:
-                print(f"\n{file.get_data()}\n")
+                print(f"\n{file.get_content()}\n")
             else:
                 FileSystem.message(f"There is no file in {TextStyle.highlight(path.str())}!")
             self.fs.set_current_directory_path(start_path)
@@ -320,13 +336,67 @@ class Console:
     def show_help(self, args : List[str]):
         if args[0] == "-a" or args[0] == "-A":
             self.show_help(list(console_documentation.keys()))
+        elif args[0] == "-l" or args[0] == "-L":
+            for comm in list(console_documentation.keys()):
+                print(comm)
         else:
             for arg in args:
                 if arg in list(console_documentation.keys()):
                     print(f"Man page for {TextStyle.highlight(arg)}")
+                    print("—" * 70)
                     print(console_documentation[arg])
+                    print("—" * 70)
                 else:
                     FileSystem.message(f"There is no man page for {TextStyle.highlight(arg)}!")
+    
+    def moveout(self, args : List[str]):
+        os.makedirs(os.path.join(MOVEOUT_FOLDER, self.fs.filesystem_name), exist_ok=True)
+        start_path = Path(self.fs.current_directory_path)
+        for path_str in args:
+            self.fs.set_current_directory_path(start_path)
+            path = self.__process_path(Path(path_str))
+            if len(path.directories) == 1:
+                self.moveout_dir(self.fs.nroot)
+                FileSystem.message("Filesystem was exported!")
+                break
+            
+            FileSystem.disable_output(True)
+            
+            self.fs.set_current_directory_path(Path(path.directories[:-1]))
+            file = self.fs.get_current_directory().get_file(path.directories[-1])
+            
+            if type(file) == File:
+                self.moveout_file(file)
+                continue
+            
+            dr = self.fs.get_current_directory().get_subdirectory(path.directories[-1])
+            
+            if type(dr) == Directory:
+                self.moveout_dir(dr)
+                continue
+            
+            FileSystem.enable_output(True)
+            FileSystem.message(f"There is no item {TextStyle.highlight(path.str())}!")
+            self.fs.set_current_directory_path(start_path)
+        
+    def moveout_file(self, file : File):
+        path = file.get_path(False)
+        
+        os.makedirs(os.path.join(MOVEOUT_FOLDER, self.fs.filesystem_name, path.str()), exist_ok=True)
+        with open(os.path.join(MOVEOUT_FOLDER, self.fs.filesystem_name, path.str(), file.get_full_name()), 'w') as out_file:
+            out_file.write(file.get_content())
+            
+    def moveout_dir(self, dr : Directory):
+        path = dr.get_path()
+        os.makedirs(os.path.join(MOVEOUT_FOLDER, self.fs.filesystem_name, path.str()), exist_ok=True)
+        
+        for item in dr.content:
+            if type(item) == File:
+               self.moveout_file(item)
+               continue
+            elif type(dr) == Directory:
+                self.moveout_dir(item)
+                continue
     
     # endregion
     
@@ -392,7 +462,6 @@ class Console:
         if inp != "":
             self.input_history.append(inp)
         return inp
-    
-    
+
 console : Console = Console()
 console.loop()
