@@ -1,7 +1,7 @@
 from neon_filesystem import *
 
 CONSOLE_VERSION : Version = Version(0, 1, 0, "NeonFileSystem Console Manager")
-VERSION.logs = np.array([
+VERSION.history = np.array([
     WhatsNew(
         Version(0, 0, 0),
         Version(1, 0, 0),
@@ -12,6 +12,144 @@ VERSION.logs = np.array([
         note = ""
     )
 ])
+
+def create_help(name : Tuple[str, str], synopsis : str, description : str, options : Tuple[str, str], examples : list = []) -> str:
+    out : str = "\n"
+    def bold(text : str) -> str:
+        return TextStyle.style(text, TextStyle.BOLD)
+    def current(text : str) -> str:
+        return TextStyle.style(text, TextStyle.BOLD_CYAN)
+    def argument(text : str) -> str:
+        return TextStyle.style(text, TextStyle.GREEN)
+    def funct(text : str) -> str:
+        return TextStyle.style(text, TextStyle.CYAN)
+    
+    out += bold("NAME") + "\n"
+    out += f"\t{current(name[0])} - {name[1]}\n\n" 
+    
+    out += bold("SYNOPSIS") + "\n"
+    out += f"\t{TextStyle.style('>', TextStyle.MAGENTA)} {current(name[0])} {synopsis}\n\n"
+    
+    out += bold("DESCRIPTION") + "\n\t" + description + "\n\n"
+    for opt in options:
+        tmp = str.split(opt[0], ",")
+        for i in range(len(tmp)):
+            tmp[i] = argument(tmp[i])
+        
+        out += f"\t{ ','.join(tmp) }\n"
+        out += f"\t\t{opt[1]}\n\n"
+    
+    if len(examples) > 0:
+        out += TextStyle.style("EXAMPLES", TextStyle.BOLD) + "\n"
+        for ex in examples:
+            out += f"\t{TextStyle.style('>', TextStyle.MAGENTA)} {current(name[0])} {argument(ex)}\n\n"
+        
+    tmp = str.split(out, "^^")
+    out = ""
+    
+    for i in range(len(tmp)):
+        if i % 2 == 1:
+            out += bold(tmp[i])
+        else:
+            out += tmp[i]
+            
+    tmp = str.split(out, "!!!")
+    out = ""
+    
+    for i in range(len(tmp)):
+        if i % 2 == 1:
+            out += funct(tmp[i])
+        else:
+            out += tmp[i]
+    
+    tmp = str.split(out, "***")
+    out = ""
+    
+    for i in range(len(tmp)):
+        if i % 2 == 1:
+            out += argument(tmp[i])
+        else:
+            out += tmp[i]
+    
+    return out
+
+# "^^" - BOLD
+# "!!!" - HIGHLIGHT COLOR COMMAND
+# "***" - HIGHLIGHT COLOR ARGUMENT
+console_documentation = {
+    "help" : create_help(
+        ("help", "help with commands"),
+        "[***COMMAND***]...",
+        "Show manual page for ***COMMAND*** with synopsis, description and examples.\n\tSame as !!!man!!!.",
+        [("-a, -A", "Show all available manual pages")],
+        ["!!!help!!!", "!!!ls!!!", "!!!mkdir!!!"]
+    ),
+    "man" : create_help(
+        ("help", "help with commands"),
+        "[***COMMAND***]...",
+        "Show manual page for ***COMMAND*** with synopsis, description and examples.\n\tSame as !!!help!!!.",
+        [("-a, -A", "Show all available manual pages")],
+        ["!!!help!!!", "!!!ls!!!", "!!!mkdir!!!"]
+    ),
+    "exit" : create_help(
+        ("exit", "close console"),
+        "",
+        "Will end neon filesystem console process",
+        [],
+        []
+    ),
+    "clear" : create_help(
+        ("clear", "clear console"),
+        "",
+        "Will clear console buffer.",
+        [],
+        []
+    ),
+    "cd" : create_help(
+        ("cd", "change current directory"),
+        "[***PATH***]",
+        "Will set current neon_filesystem directory tp given ***PATH***.",
+        [],
+        ["nroot/user/desktop", "..", "desktop/trash/"]
+    ),
+    "ls" : create_help(
+        ("ls", "list directory content"),
+        "[***OPTIONS***] [***PATH***]...",
+        "Will show content of directory in ***PATH***.\n\tIf ***PATH*** is empty, will show content of current directory.",
+        [("-R", "Recursively show content of subdirectories")],
+        ["nroot/tmp", "", "-R nroot"]
+    ),
+    "touch" : create_help(
+        ("touch", "create empty file"),
+        "[***FILE***]...",
+        "Will create new empty file in ***FILE*** path and name.",
+        [],
+        ["nroot/tmp/log23.tmp nroot/tmp/log24.tmp", "calculator.py", "/desktop/trash/image03.png"]
+    ),
+    "mkdir" : create_help(
+        ("mkdir", "create empty directoory"),
+        "[***DIRECTORY***]...",
+        "Will create new empty direcory in ***DIRECTORY*** path and name.",
+        [],
+        ["nroot/tmp/snap nroot/tmp/wine", "new-folder", "/desktop/homework"]
+    ),
+    "rm" : create_help(
+        ("rm", "remove file or directory"),
+        "[***OPTIONS***]... [***FILE***]...",
+        "Will remove file or directory in ***FILE*** path and name.",
+        [("-r, -R", "Remove folder even if it is not empty")],
+        ["nroot/tmp/log27.tmp nroot/tmp/log28.tmp", "-r desktop", "trash/image.png"]
+    ),
+    "cat" : create_help(
+        ("cat", "print file content"),
+        "[***FILE***]...",
+        "Will print content of ***FILE*** file",
+        [],
+        ["nroot/tmp/log27.tmp nroot/tmp/log28.tmp", "homework.docs", "trash/notes.txt"]
+    ),
+}   
+
+print(console_documentation["mkdir"])
 
 class Console:
     def __init__(self):
@@ -27,8 +165,9 @@ class Console:
         FileSystem.enable_output()
         
         if self.fs == None:
-            FileSystem.message(f"Tried to load default filesystem. There is no such file!")
-            self.__wait_for_system_loading()
+            FileSystem.message(f"Tried to load default filesystem. There is no such file!\nNew one will be created and loaded!")
+            self.fs = FileSystem.default_fs()
+            self.save_filesystem(f"{DEFAULT_SYSTEM_FILE_NAME}.{DEFAULT_SYSTEM_FILE_EXTENSION}")
             
     def loop(self):
         while self.running:
@@ -54,6 +193,11 @@ class Console:
                         self.echo("")
                     else:
                         self.echo(tmp[1])
+                case "help" | "man":
+                    if len(commands) == 1:
+                        FileSystem.message(f"Command {TextStyle.highlight(commands[0])} missing arguments!\nTry {TextStyle.highlight('help help')} for additional information!")
+                    else:
+                        self.show_help(commands[1:])
                 case "touch":
                     if len(commands) == 1:
                         FileSystem.message(f"Command {TextStyle.highlight('touch')} missing arguments!")
@@ -138,6 +282,9 @@ class Console:
         start_path = Path(self.fs.current_directory_path)
         for path in args:
             path = self.__process_path(Path(path))
+            if len(path.directories) == 1:
+                FileSystem.message("You cant delete main nroot directory ;-)")
+                continue
             FileSystem.disable_output(True)
             self.fs.set_current_directory_path(Path(path.directories[:-1]))
             file = self.fs.get_current_directory().get_file(path.directories[-1])
@@ -169,6 +316,17 @@ class Console:
             else:
                 FileSystem.message(f"There is no file in {TextStyle.highlight(path.str())}!")
             self.fs.set_current_directory_path(start_path)
+    
+    def show_help(self, args : List[str]):
+        if args[0] == "-a" or args[0] == "-A":
+            self.show_help(list(console_documentation.keys()))
+        else:
+            for arg in args:
+                if arg in list(console_documentation.keys()):
+                    print(f"Man page for {TextStyle.highlight(arg)}")
+                    print(console_documentation[arg])
+                else:
+                    FileSystem.message(f"There is no man page for {TextStyle.highlight(arg)}!")
     
     # endregion
     
@@ -220,13 +378,6 @@ class Console:
         else:
             self.fs.save(path)
     
-    def __wait_for_system_loading(self):
-        while type(self.fs) != FileSystem or not self.fs.is_valid():
-            path = Path(self.get_input("Please enter path to file that contain filesystem!"))
-            if not path.is_empty():
-                FileSystem.error("Entered path is empty!")
-            else:
-                self.load_filesystem(path)
     
     def get_input(self, message : str = "") -> str:
         FileSystem.message(message)

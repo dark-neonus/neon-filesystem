@@ -1,6 +1,6 @@
 import numpy as np
 import os
-from typing import Union, List
+from typing import Union, List, Tuple
 
 
 class Directory:
@@ -115,7 +115,7 @@ class Version:
         self.major : int = int(major)
         self.minor : int = int(minor)
         self.patch : int = int(patch)
-        self.logs : np.array = np.array([], dtype=object)
+        self.history : np.array = np.array([], dtype=object)
         self.information_text : str = information_text
         
     def str(self, addition_text : bool = False) -> str:
@@ -129,30 +129,29 @@ class Version:
         return Version(tmp[0], tmp[1], tmp[2])
     
     def whats_new(self, addition_text : bool = False) -> str:
-        add_txt = TextStyle.style("What's new", TextStyle.BOLD_BLUE) + f" ( {TextStyle.style(self.logs[-1].old_version.str(), TextStyle.DARK_GRAY)} -> {TextStyle.style(self.logs[-1].current_version.str(), TextStyle.CYAN)} ):\n" if addition_text else ""
-        return add_txt + self.logs[-1].str(addition_text) 
+        add_txt = TextStyle.style("What's new", TextStyle.BOLD_BLUE) + f" ( {TextStyle.style(self.history[-1].old_version.str(), TextStyle.DARK_GRAY)} -> {TextStyle.style(self.history[-1].current_version.str(), TextStyle.CYAN)} ):\n" if addition_text else ""
+        return add_txt + self.history[-1].str(addition_text) 
     
 class Iterator:
     def __init__(self, value : int):
-        self.value = value
+        self.value : int = value
         
 class StringHolder:
     def __init__(self, string : str):
-        self.string = string
+        self.string : str = string
 
 class Path:
     forbidden_symbol = "/"
     def __init__(self, path : Union[str, Path, List[str]] = ""):
-        self.directories = []
+        self.directories : list = []
         self.add_path(path)
         
-    def is_empty(self):
+    def is_empty(self) -> bool:
         return len(self.directories) == 0
         
-    def add_path(self, path : Path):
+    def add_path(self, path : Union[Path, str, list]):
         if type(path) == Path:
-            for dir in path.directories:
-                self.directories.append(dir)
+            self.add_path(path.directories)
         elif type(path) == str:
             self.add_path(str.split(path, "/"))
         elif type(path) == list:
@@ -174,13 +173,16 @@ class Path:
     def str(self) -> str:
         return "/".join(self.directories)
     
+    def __str__(self) -> str:
+        return self.str()
+    
     def get_os_path(self) -> os.path:
         return os.path.join(*self.directories)
     
     
 
 VERSION : Version = Version(1, 2, 0, "NeonFileSystem")
-VERSION.logs = np.array([
+VERSION.history = np.array([
     WhatsNew(
         Version(1, 0, 1),
         Version(1, 1, 0),
@@ -216,6 +218,15 @@ VERSION.logs = np.array([
         change="increase code safety, now Path class support all symbols but \"/\"",
         fixes="bug and mistakes fixes",
         note =""
+    ),
+    WhatsNew(
+        Version(1, 3, 0),
+        Version(1, 3, 1),
+        add="function in FileSystem to create default filesystem",
+        remove="get_type_by_name() function from Coder class, because it is not needed",
+        change="small code cleaning, documentation big update",
+        fixes="",
+        note =""
     )
 ])
 print(VERSION.str(True))
@@ -247,10 +258,6 @@ class Coder:
         # Convert the binary string to bytes and then decode
         decoded_string = bytes(int(binary_string[i:i+8], 2) for i in range(0, len(binary_string), 8)).decode('utf-8')
         return decoded_string
-
-    @staticmethod
-    def get_type_by_name(name : str) -> type:
-        return eval(name)
 
 
 class File:
@@ -518,6 +525,7 @@ class Directory:
            
 class FileSystem:
     fsi_separator : str = "~"
+    ROOT_NAME : str = "nroot"
     
     global_filesystem : FileSystem = FileSystem()
     @staticmethod
@@ -587,15 +595,19 @@ class FileSystem:
         FileSystem.save_logs = False
     # endregion
     
-    def __init__(self, name : str = DEFAULT_SYSTEM_FILE_NAME, root_name : str = "nroot"):
+    def __init__(self, name : str = DEFAULT_SYSTEM_FILE_NAME):
         self.filesystem_name : str = name
         self.version : Version = VERSION
-        self.nroot : Directory = Directory(root_name)
+        self.nroot : Directory = Directory(FileSystem.ROOT_NAME)
         self.current_directory_path : Path = self.nroot.get_path()
         self.__valid : bool = True
         self.__was_changed = False
         if Path.forbidden_symbol in self.filesystem_name:
             raise RuntimeError(f"FileSystem name {self.filesystem_name} cant contain \"{Path.forbidden_symbol}\"")
+        
+    @staticmethod
+    def default_fs():
+        return FileSystem()
         
     def is_valid(self) -> bool:
         return self.__valid
