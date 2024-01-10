@@ -181,7 +181,7 @@ class Path:
     
     
 
-VERSION : Version = Version(1, 2, 0, "NeonFileSystem")
+VERSION : Version = Version(1, 3, 3, "NeonFileSystem")
 VERSION.history = np.array([
     WhatsNew(
         Version(1, 0, 1),
@@ -235,6 +235,15 @@ VERSION.history = np.array([
         remove="",
         change="content of file now have name \"content\" instead of data",
         fixes="",
+        note =""
+    ),
+    WhatsNew(
+        Version(1, 3, 2),
+        Version(1, 3, 3),
+        add="",
+        remove="",
+        change="",
+        fixes="Outdated version number",
         note =""
     )
 ])
