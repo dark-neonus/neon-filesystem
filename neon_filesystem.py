@@ -247,6 +247,15 @@ VERSION.history = np.array([
     ),
     WhatsNew(
         Version(1, 3, 2),
+        Version(1, 3, 3),
+        add="",
+        remove="",
+        change="",
+        fixes="Outdated version number",
+        note =""
+    ),
+    WhatsNew(
+        Version(1, 3, 3),
         Version(1, 4, 0),
         add="debugging instrucments and showing message/warning/error source",
         remove="",
