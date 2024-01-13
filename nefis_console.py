@@ -208,9 +208,9 @@ class Console:
         self.autosave = True
         self.__loaded_fs_path : Path = None
         
-        FileSystem.disable_output()
+        FileSystem.disable_output(True)
         self.load_filesystem(f"{DEFAULT_SYSTEM_FILE_NAME}.{DEFAULT_SYSTEM_FILE_EXTENSION}")
-        FileSystem.enable_output()
+        FileSystem.enable_output(True)
         
         if self.fs == None:
             FileSystem.message(f"Tried to load default filesystem. There is no such file!\nNew one will be created and loaded!", self.__init__)
